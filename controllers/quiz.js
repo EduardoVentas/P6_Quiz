@@ -1,6 +1,7 @@
 const Sequelize = require("sequelize");
 const {models} = require("../models");
 
+
 // Autoload the quiz with id equals to :quizId
 exports.load = (req, res, next, quizId) => {
 
@@ -138,41 +139,6 @@ exports.play = (req, res, next) => {
     });
 };
 
-exports.randomplay =(req, res, next) =>{
-
-    var posicion;
-
-    const{query} =req;
-    var answer = req.query.answer || '';
-
-    req.session.score = req.session.score || 0;
-
-    models.quiz.findAll({raw: true})
-    .then(fuction(quiz){
-        //inicializa todos los quizzes sino existe y si ya existia le doy el valor quiz
-        req.session.quiz = req.session.quiz || quiz;
-        //por si la posicion aleatoria es de una pregunta que ya ha sido elegida entonces
-        //vale 0, 
-        while(quiz==0){
-            posicion= Math.floor(Math.random()*req.session.quiz.length);
-            if(posicion == quizzes.length)
-                posicion--;
-                quiz= req.session.quizzes[posicion];
-        }
-        //Pones ese quiz a cero porque no quieres poder cogerlo en el futuro
-        req.session.quiz[posicion]=0;
-        res.render(quizzes/randomplay',{
-            quiz:quiz,
-            answer: answer,
-            score: req.session.score
-        });
-
-    })
-    .catch(function(error){
-        next(error);
-    });
-
-};
 
 // GET /quizzes/:quizId/check
 exports.check = (req, res, next) => {
@@ -189,32 +155,92 @@ exports.check = (req, res, next) => {
     });
 };
 
-exports.randomcheck = (req, res, next) =>{
-    const {quiz, query} = req;
 
-    const answer = query.answer || "";
-    const result = answer.toLowerCase().trim() === quiz.answer.toLowerCase().trim();
+//Practica6 randomplay al azar una pregunta en BBDD,sin repetir la pregunta.
+//GET quizzes/randomplay
+exports.randomplay = (req, res, next) => {
 
-    var quizzes =req.session.quiz;
 
-    if(result){
-        req.session.score++;
-        var score =req.session.score;
-    }else{
-        var score = req.session.score;
-        req.session.score=0;
+
+    //Si session es vacio,desde 0
+    if(req.session.randomplay === undefined) {
+        req.session.nota = 0;
+
+        models.quiz.findAll()
+            .then(quiz => {
+                req.session.randomplay = quiz;
+                req.session.idofquiz = Math.floor(Math.random()*req.session.randomplay.length);
+                res.render('quizzes/random_play', {
+                    quiz : req.session.randomplay[req.session.idofquiz],
+                    score: req.session.nota
+                });
+
+            })
     }
-    if(score === quizzes.length){
-        res.render('quizzes/random_nomore', {
-           score: score
+    //Ya exite alguna quiz en session.
+    else {
+
+        req.session.idofquiz = Math.floor(Math.random()*req.session.randomplay.length);
+        res.render('quizzes/random_play', {
+            quiz: req.session.randomplay[req.session.idofquiz],
+            score: req.session.nota
         });
-    }else{
-        res.render('quizzes/random_result',{
-            quiz: req.quiz,
+
+    }
+
+
+
+
+};
+
+exports.randomcheck = (req, res, next) => {
+    let result = false;
+    let nota = -1;
+
+
+
+    if(trimm(req.query.answer) === trimm(req.session.randomplay[req.session.idofquiz]).answer){
+        req.session.nota++;
+        nota = req.session.nota;
+        result = true;
+        req.session.randomplay.splice(req.session.idofquiz, 1);
+
+
+        if(req.session.randomplay.length === 0) {
+
+                    res.render('quizzes/random_nomore', {
+                        score: req.session.nota
+                    });
+
+
+        }
+        else{
+                res.render('quizzes/random_result', {
+                    score: nota,
+                    result: result,
+                    answer: req.session.randomplay[req.session.idofquiz].answer
+                });
+        }
+    }
+    else{
+        nota = req.session.nota;
+        res.session.nota = 0;
+
+        res.render('quizzes/random_result', {
+            score: nota,
             result: result,
-            answer: answer,
-            score: score
+            answer: req.query.answer
         });
     }
 
+
+
+};
+
+trimm = rl => {
+    rl = rl.replace(/\s+/g,"");
+    rl = rl.toUpperCase();
+    rl = rl.toLowerCase();
+    rl = rl.trim();
+    return rl;
 };
